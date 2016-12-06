@@ -1,12 +1,38 @@
-import DES
+# -*- coding: utf-8
 from bitarray import bitarray
+from functions import form_sequence, bitarray_to_hex_string
 
-encryptor = DES.Encryptor(bitarray(56, endian='big'))
+# Проверка первого случая.
+# K и S случайны.
+key = bitarray(56, endian='big')
+s = bitarray(64, endian='big')
 
-message = bitarray(64, endian='big')
-cryptogram = encryptor.encrypt(message)
+result = form_sequence(key, s)
 
-decrypted = encryptor.decrypt(cryptogram)
+print 'Initial:'
+print 'K: {0}'.format(key)
+print 'S: {0}'.format(s)
+print 'Result: {0}'.format(result)
+print 'Hex result: {0}'.format(bitarray_to_hex_string(result))
 
-print(message)
-print(decrypted)
+# Проверка второго случая.
+# Один из битов K меняется на противоположный, S неизменна.
+key[0] = not key[0]
+result = form_sequence(key, s)
+
+print 'Changed K[0]:'
+print 'K: {0}'.format(key)
+print 'S: {0}'.format(s)
+print 'Result: {0}'.format(result)
+print 'Hex result: {0}'.format(bitarray_to_hex_string(result))
+
+# Проверка треттьего случая.
+# K неизменный, один из битов S менятется на противоположный.
+s[0] = not s[0]
+result = form_sequence(key, s)
+
+print 'Changed S[0]:'
+print 'K: {0}'.format(key)
+print 'S: {0}'.format(s)
+print 'Result: {0}'.format(result)
+print 'Hex result: {0}'.format(bitarray_to_hex_string(result))

@@ -5,9 +5,12 @@ import tables
 
 
 class Encryptor(object):
-    def __init__(self, key):
+    def __init__(self, key, variant=1, cycles_count=1):
         self._key = key
         self._generate_keys()
+        self._variant = variant
+        self._cycles_count = cycles_count
+        self._form_big_table()
 
     def encrypt(self, block):
         if not isinstance(block, bitarray):
@@ -25,7 +28,6 @@ class Encryptor(object):
 
 
         reverted_after_feistel = self._do_decypher_cycles(after_feistel)
-        print()
 
         return result
 
@@ -95,15 +97,15 @@ class Encryptor(object):
         return result
 
     def _do_cypher_cycles(self, block):
-        l = [None] * 17
-        r = [None] * 17
-        t = [None] * 17
+        l = [None] * (self._cycles_count + 1)
+        r = [None] * (self._cycles_count + 1)
+        t = [None] * (self._cycles_count + 1)
 
         l[0] = block[0:32]
         r[0] = block[32:64]
         t[0] = l[0] + r[0]
 
-        for i in xrange(1, 17):
+        for i in xrange(1, self._cycles_count + 1):
             l[i] = r[i - 1].copy()
             r[i] = l[i - 1] ^ self._cypher_function(r[i - 1], self._keys[i - 1]  # СДЕЛАТЬ ГЕНЕРАЦИЮ КЛЮЧЕЙ
                                                     )
@@ -112,15 +114,15 @@ class Encryptor(object):
         return t[len(t) - 1]
 
     def _do_decypher_cycles(self, block):
-        l = [None] * 17
-        r = [None] * 17
-        t = [None] * 17
+        l = [None] * (self._cycles_count + 1)
+        r = [None] * (self._cycles_count + 1)
+        t = [None] * (self._cycles_count + 1)
 
-        l[16] = block[:32]
-        r[16] = block[32:]
-        t[16] = l[16] + r[16]
+        l[self._cycles_count] = block[:32]
+        r[self._cycles_count] = block[32:]
+        t[self._cycles_count] = l[self._cycles_count] + r[self._cycles_count]
 
-        for i in xrange(16, 0, -1):
+        for i in xrange(self._cycles_count, 0, -1):
             r[i - 1] = l[i].copy()
             l[i - 1] = r[i] ^ self._cypher_function(l[i], self._keys[i - 1])
 
@@ -135,14 +137,21 @@ class Encryptor(object):
             start_index = i * 6
             blocks[i] = after_expansion[start_index:start_index + 6]
 
-        transformed_r = bitarray()
-        transformed_blocks = [None] * 8
-        for i in xrange(0, 8):
-            transformed_blocks[i] = self._block6to4(blocks[i], i)
-            transformed_r += transformed_blocks[i]
+        if self._variant == 1:
+            transformed_r = bitarray()
+            transformed_blocks = [None] * 8
+            for i in xrange(0, 8):
+                transformed_blocks[i] = self._block6to4(blocks[i], i)
+                transformed_r += transformed_blocks[i]
+        elif self._variant == 2:
+            transformed_r = bitarray()
+            transformed_blocks = [None] * 4
+            for i in xrange(0, 4):
+                ind = i * 2
+                transformed_blocks[i] = self._block12to8(blocks[ind], blocks[ind + 1], i)
+                transformed_r += transformed_blocks[i]
 
         result = self._do_permutation_p(transformed_r)
-
         return result
 
     def _expand_vector(self, vector):
@@ -152,6 +161,7 @@ class Encryptor(object):
             result[i] = vector[tables.EXPANSION_PERMUTATION[i] - 1]
         return result
 
+
     def _block6to4(self, block, s_number):
         result = bitarray(4, endian='big')
         result.setall(False)
@@ -159,11 +169,53 @@ class Encryptor(object):
         s_row = Encryptor.bitarray_to_int(block[0::5])
         s_column = Encryptor.bitarray_to_int(block[1:5])
 
-        b = tables.SUBSTITUTION[s_number][s_row][s_column]
+        index = s_row * 16 + s_column
+
+        b = tables.SUBSTITUTION[s_number][index]
 
         result = bitarray(Encryptor.to_binary(b))[60:64]
 
         return result
+
+
+    def _block12to8(self, block_1, block_2, s_number):
+        result = bitarray(8, endian='big')
+        result.setall(False)
+
+        s_row_1 = Encryptor.bitarray_to_int(block_1[0::5])
+        s_column_1 = Encryptor.bitarray_to_int(block_1[1:5])
+        index_1 = s_row_1 * 16 + s_column_1
+
+        s_row_2 = Encryptor.bitarray_to_int(block_2[0::5])
+        s_column_2 = Encryptor.bitarray_to_int(block_2[1:5])
+        index_2 = s_row_2 * 16 + s_column_2
+
+        #index_big = (index_2 << 4) + index_1
+        index_big = (index_2 << 4) + index_1
+        # index_big = Encryptor.bitarray_to_int(block_1+block_2)
+
+        b = self._big_table[s_number][index_big]
+
+        result = bitarray(Encryptor.to_binary(b))[56:64]
+
+        return result
+
+
+    def _form_big_table(self):
+        self._big_table = [None] * 4
+
+        for row in xrange(0, 4):
+            ind = row * 2
+            si = tables.SUBSTITUTION[ind]
+            si2 = tables.SUBSTITUTION[ind + 1]
+            row_s = [None] * 4096
+            for i in xrange(0, 64):
+                for j in xrange(0, 64):
+                    ij = (j << 6) + i
+                    #row_s[ij] = (si2[j] << 4) + si[i]
+                    row_s[ij] = (si[j] << 4) + si2[i]
+            self._big_table[row] = row_s
+
 
     def _do_permutation_p(self, vector):
         result = bitarray(32, endian='big')
@@ -171,12 +223,14 @@ class Encryptor(object):
             result[i] = vector[tables.PERMUTATION_P[i] - 1]
         return result
 
+
     def _do_final_permutation(self, vector):
         result = bitarray(64, endian='big')
         result.setall(False)
         for i in xrange(0, 64):
             result[i] = vector[tables.FINAL_PERMUTATION[i] - 1]
         return result
+
 
     @staticmethod
     def bitarray_to_int(bin_array):
@@ -192,9 +246,11 @@ class Encryptor(object):
                 multiplier *= 2
         return result
 
+
     @staticmethod
     def to_binary(n):
         return ''.join(str(1 & int(n) >> i) for i in range(64)[::-1])
+
 
     @staticmethod
     def cyclic_shift(vector, direction, n):
