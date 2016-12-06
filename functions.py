@@ -50,3 +50,8 @@ def form_sequence(key, s):
         result[iteration] = x[0]
 
     return result
+
+
+def write_bitarray_to_file(array, filename):
+    with open(filename, 'wb') as file:
+        file.write(array.tobytes())

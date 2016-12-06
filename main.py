@@ -1,6 +1,6 @@
 # -*- coding: utf-8
 from bitarray import bitarray
-from functions import form_sequence, bitarray_to_hex_string
+from functions import form_sequence, bitarray_to_hex_string, write_bitarray_to_file
 
 # Проверка первого случая.
 # K и S случайны.
@@ -14,6 +14,7 @@ print 'K: {0}'.format(key)
 print 'S: {0}'.format(s)
 print 'Result: {0}'.format(result)
 print 'Hex result: {0}'.format(bitarray_to_hex_string(result))
+write_bitarray_to_file(result, '1.result')
 
 # Проверка второго случая.
 # Один из битов K меняется на противоположный, S неизменна.
@@ -25,6 +26,7 @@ print 'K: {0}'.format(key)
 print 'S: {0}'.format(s)
 print 'Result: {0}'.format(result)
 print 'Hex result: {0}'.format(bitarray_to_hex_string(result))
+write_bitarray_to_file(result, '2.result')
 
 # Проверка треттьего случая.
 # K неизменный, один из битов S менятется на противоположный.
@@ -36,3 +38,4 @@ print 'K: {0}'.format(key)
 print 'S: {0}'.format(s)
 print 'Result: {0}'.format(result)
 print 'Hex result: {0}'.format(bitarray_to_hex_string(result))
+write_bitarray_to_file(result, '3.result')
